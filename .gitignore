@@ -1,1 +1,16 @@
 .idea/*
+__pycache__/
+*.pyc
+*.pkl
+*.log
+*.png
+*.backup
+runexp6.py
+records/
+errors/
+temp.tensorboard/
+CityFlow/
+colight/
+model/
+*.DS_Store
+

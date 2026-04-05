@@ -475,8 +475,8 @@ class Pipeline:
                 p = Process(target=model_test.test,
                             args=(self.dic_path["PATH_TO_MODEL"], cnt_round, self.dic_exp_conf["RUN_COUNTS"], self.dic_traffic_env_conf, False))
                 p.start()
-                if self.dic_exp_conf["EARLY_STOP"]:
-                    p.join()
+                # if self.dic_exp_conf["EARLY_STOP"]:
+                p.join()
             else:
                 model_test.test(self.dic_path["PATH_TO_MODEL"], cnt_round, self.dic_exp_conf["RUN_COUNTS"], self.dic_traffic_env_conf, if_gui=False)
 

@@ -61,7 +61,7 @@ class CoLightAgent(Agent):
         """
         super(CoLightAgent, self).__init__(
             dic_agent_conf, dic_traffic_env_conf, dic_path,intersection_id)
-
+        #self.len_feature=13
         self.att_regulatization=dic_agent_conf['att_regularization']
         self.CNN_layers=dic_agent_conf['CNN_layers']
         
@@ -70,12 +70,13 @@ class CoLightAgent(Agent):
         self.num_neighbors=min(dic_traffic_env_conf['TOP_K_ADJACENCY'],self.num_agents)
         self.vec=np.zeros((1,self.num_neighbors))
         self.vec[0][0]=1
-
-        self.num_actions = len(self.dic_traffic_env_conf["PHASE"][self.dic_traffic_env_conf['SIMULATOR_TYPE']])
+        # self.num_actions = len(self.dic_traffic_env_conf["PHASE"][self.dic_traffic_env_conf['SIMULATOR_TYPE']])
+        self.num_actions = 4 ##len(self.DIC_PHASE_MAP) - 1  # ignore -1
+        print("Agent num_actions:", self.num_actions)
         self.num_lanes = np.sum(np.array(list(self.dic_traffic_env_conf["LANE_NUM"].values())))
-        self.len_feature=self.compute_len_feature()
+        self.len_feature=32 #self.compute_len_feature()
         self.memory = self.build_memory()
-
+        print("PHASE MAP:", self.dic_traffic_env_conf["PHASE"][self.dic_traffic_env_conf['SIMULATOR_TYPE']])
         if cnt_round == 0: 
             # initialization
             self.q_network = self.build_network()
@@ -148,8 +149,15 @@ class CoLightAgent(Agent):
 
 
     def compute_len_feature(self):
+        return 32
+    """
         from functools import reduce
         len_feature=tuple()
+        print("LIST_STATE_FEATURE:", self.dic_traffic_env_conf["LIST_STATE_FEATURE"])
+        print("DIC_FEATURE_DIM:", self.dic_traffic_env_conf["DIC_FEATURE_DIM"])
+        print("num_lanes:", self.num_lanes)
+        print("Computed len_feature:", sum(len_feature))
+
         for feature_name in self.dic_traffic_env_conf["LIST_STATE_FEATURE"]:
             if "adjacency" in feature_name:
                 continue
@@ -158,6 +166,7 @@ class CoLightAgent(Agent):
             elif feature_name=="lane_num_vehicle":
                 len_feature += (self.dic_traffic_env_conf["DIC_FEATURE_DIM"]["D_"+feature_name.upper()][0]*self.num_lanes,)
         return sum(len_feature)
+"""
 
     """
     components of the network

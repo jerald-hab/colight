@@ -226,6 +226,9 @@ class Intersection:
         for index, lane_id in enumerate(self.list_entering_lanes):
             self.adjacency_row_lane_id_local[lane_id] = index
 
+        print("DIC_PHASE_MAP keys:", self.DIC_PHASE_MAP.keys())
+        print("num_phases:", len(self.DIC_PHASE_MAP))
+        print("Intersection DIC_PHASE_MAP:", self.DIC_PHASE_MAP)
         # previous & current
         self.dic_lane_vehicle_previous_step = {}
         self.dic_lane_waiting_vehicle_count_previous_step = {}
@@ -734,7 +737,36 @@ class Intersection:
     def get_feature(self):
 
         return self.dic_feature
+    """
+    def get_state(self, list_state_features):
+        # Collect raw components
+        raw_parts = []
 
+        for key in list_state_features:
+            val = self.dic_feature[key]
+
+            # Flatten each component
+            arr = np.array(val).reshape(-1)
+            raw_parts.append(arr)
+
+        # Concatenate into one feature vector
+        feature = np.concatenate(raw_parts, axis=0)
+
+        # Pad/truncate to 32 dims (CoLight requirement)
+        target_dim = 32
+        if feature.size < target_dim:
+            feature = np.pad(feature, (0, target_dim - feature.size))
+        elif feature.size > target_dim:
+            feature = feature[:target_dim]
+
+        # Build adjacency (already stored in dic_feature)
+        adjacency = np.array(self.dic_feature.get("adjacency_matrix", []))
+
+        return {
+            "feature": feature.astype(np.float32),
+            "adjacency_matrix": adjacency.astype(np.float32)
+        }
+    """
     def get_state(self, list_state_features):
         # customize your own state
         # print(list_state_features)
@@ -742,25 +774,57 @@ class Intersection:
         dic_state = {state_feature_name: self.dic_feature[state_feature_name] for state_feature_name in list_state_features}
 
         return dic_state
-
+    
     def get_reward(self, dic_reward_info):
-        # customize your own reward
         dic_reward = dict()
-        dic_reward["flickering"] = None
-        dic_reward["sum_lane_queue_length"] = None
-        dic_reward["sum_lane_wait_time"] = None
-        dic_reward["sum_lane_num_vehicle_left"] = None
-        dic_reward["sum_duration_vehicle_left"] = None
-        dic_reward["sum_num_vehicle_been_stopped_thres01"] = None
-        dic_reward["sum_num_vehicle_been_stopped_thres1"] = np.sum(self.dic_feature["lane_num_vehicle_been_stopped_thres1"])
 
-        dic_reward['pressure'] = None # np.sum(self.dic_feature["pressure"])
+        # compute pressure
+        pressure = np.sum(self.dic_feature["lane_num_vehicle"])
+
+        # set all unused rewards to 0 instead of None
+        dic_reward["flickering"] = 0
+        dic_reward["sum_lane_queue_length"] = 0
+        dic_reward["sum_lane_wait_time"] = 0
+        dic_reward["sum_lane_num_vehicle_left"] = 0
+        dic_reward["sum_duration_vehicle_left"] = 0
+        dic_reward["sum_num_vehicle_been_stopped_thres01"] = 0
+        dic_reward["sum_num_vehicle_been_stopped_thres1"] = 0
+        dic_reward["pressure"] = pressure
 
         reward = 0
         for r in dic_reward_info:
             if dic_reward_info[r] != 0:
                 reward += dic_reward_info[r] * dic_reward[r]
+
+        return reward 
+    """
+    def get_reward(self, dic_reward_info):
+        dic_reward = dict()
+
+        # compute actual pressure: incoming - outgoing, or just queue-based
+        # simplest: use lane_num_vehicle as a proxy for pressure
+        pressure = np.sum(self.dic_feature["lane_num_vehicle"])
+
+        dic_reward["flickering"] = 0
+        dic_reward["sum_lane_queue_length"] = 0
+        dic_reward["sum_lane_wait_time"] = 0
+        dic_reward["sum_lane_num_vehicle_left"] = 0
+        dic_reward["sum_duration_vehicle_left"] = 0
+        dic_reward["sum_num_vehicle_been_stopped_thres01"] = 0
+        dic_reward["sum_num_vehicle_been_stopped_thres1"] = 0
+        dic_reward["pressure"] = pressure
+        reward = 0
+        for r in dic_reward_info:
+            if dic_reward_info[r] != 0:
+                reward += dic_reward_info[r] * dic_reward[r]
+        ''' print(
+           "INTER REWARD DEBUG | id:", self.inter_name,
+            "| lane_num_vehicle:", self.dic_feature["lane_num_vehicle"],
+            "| pressure:", pressure,
+            "| reward:", reward
+        )'''
         return reward
+    """    
 
 class AnonEnv:
     list_intersection_id = [
@@ -772,7 +836,7 @@ class AnonEnv:
         self.path_to_work_directory = path_to_work_directory
         self.dic_traffic_env_conf = dic_traffic_env_conf
         self.simulator_type = self.dic_traffic_env_conf["SIMULATOR_TYPE"]
-
+        print("phase = ",self.dic_traffic_env_conf["PHASE"])
         self.list_intersection = None
         self.list_inter_log = None
         self.list_lanes = None
@@ -810,9 +874,34 @@ class AnonEnv:
         print("=========================")
         print(cityflow_config)
 
-        with open(os.path.join(self.path_to_work_directory,"cityflow.config"), "w") as json_file:
+        # Write the generated config
+        config_path = os.path.join(self.path_to_work_directory, "cityflow.config")
+        with open(config_path, "w") as json_file:
             json.dump(cityflow_config, json_file)
-        self.eng = engine.Engine(os.path.join(self.path_to_work_directory,"cityflow.config"), thread_num=1)
+
+        # >>> CORRECT FILE COPY BLOCK (NO self.data_path) <<<
+        import shutil
+
+        dataset_dir = "data/template_lsr/6_6"
+
+        shutil.copy(
+            os.path.join(dataset_dir, cityflow_config["roadnetFile"]),
+            self.path_to_work_directory
+        )
+
+        shutil.copy(
+            os.path.join(dataset_dir, cityflow_config["flowFile"]),
+            self.path_to_work_directory
+        )
+        # >>> END BLOCK <<<
+
+        # Now create the engine
+        self.eng = engine.Engine(config_path, thread_num=1)
+        print(">>> WORK DIRECTORY:", self.path_to_work_directory)
+        print(">>> Writing CityFlow config to:", config_path)
+        # with open(os.path.join(self.path_to_work_directory,"cityflow.config"), "w") as json_file:
+            # json.dump(cityflow_config, json_file)
+        # self.eng = engine.Engine(os.path.join(self.path_to_work_directory,"cityflow.config"), thread_num=1)
         # self.load_roadnet()
         # self.load_flow()
 
@@ -909,10 +998,8 @@ class AnonEnv:
 
             action_in_sec = list_action_in_sec[i]
             action_in_sec_display = list_action_in_sec_display[i]
-
             instant_time = self.get_current_time()
             self.current_time = self.get_current_time()
-
             before_action_feature = self.get_feature()
             # state = self.get_state()
 
@@ -924,16 +1011,14 @@ class AnonEnv:
 
             self._inner_step(action_in_sec)
 
-
             # get reward
             if self.dic_traffic_env_conf['DEBUG']:
                 start_time = time.time()
-
+            #print("DEBUG lane_num_vehicle:", self.dic_feature["lane_num_vehicle"])
             reward = self.get_reward()
 
             if self.dic_traffic_env_conf['DEBUG']:
                 print("Reward time: {}".format(time.time()-start_time))
-
 
             for j in range(len(reward)):
                 average_reward_action_list[j] = (average_reward_action_list[j] * i + reward[j]) / (i + 1)
@@ -941,9 +1026,18 @@ class AnonEnv:
             # average_reward_action = (average_reward_action*i + reward[0])/(i+1)
 
             # log
-            self.log(cur_time=instant_time, before_action_feature=before_action_feature, action=action_in_sec_display)
+            #self.log(cur_time=instant_time, before_action_feature=before_action_feature, action=action_in_sec_display)
 
             next_state, done = self.get_state()
+            #next_state = [self.get_state()] 
+
+            self.log(
+                cur_time=instant_time,
+                before_action_feature=before_action_feature,
+                action=action_in_sec_display,
+                reward=reward,
+                next_state=next_state
+            )
 
         print("Step time: ", time.time() - step_start_time)
         return next_state, reward, done, average_reward_action_list
@@ -1015,7 +1109,11 @@ class AnonEnv:
 
         if self.dic_traffic_env_conf['DEBUG']:
             print("Update measurements time: {}".format(time.time()-start_time))
-
+        # aggregate features across intersections
+        self.dic_feature = {}
+        self.dic_feature["lane_num_vehicle"] = np.concatenate(
+            [inter.dic_feature["lane_num_vehicle"] for inter in self.list_intersection]
+        ) 
         #self.log_lane_vehicle_position()
         # self.log_first_vehicle()
         #self.log_phase()
@@ -1080,13 +1178,24 @@ class AnonEnv:
 
     def get_current_time(self):
         return self.eng.get_current_time()
-
+    """
     def log(self, cur_time, before_action_feature, action):
 
         for inter_ind in range(len(self.list_intersection)):
             self.list_inter_log[inter_ind].append({"time": cur_time,
                                                     "state": before_action_feature[inter_ind],
                                                     "action": action[inter_ind]})
+    """
+    def log(self, cur_time, before_action_feature, action, reward, next_state):
+
+        for inter_ind in range(len(self.list_intersection)):
+            self.list_inter_log[inter_ind].append({
+                "time": cur_time,
+                "state": before_action_feature[inter_ind],
+                "action": action[inter_ind],
+                "reward": reward[inter_ind],
+                "next_state": next_state[inter_ind]
+            })
 
     def batch_log(self, start, stop):
         for inter_ind in range(start, stop):
@@ -1655,9 +1764,3 @@ if __name__ == '__main__':
     env = AnonEnv(path_to_log, dic_path["PATH_TO_WORK_DIRECTORY"], dic_traffic_env_conf)
     env.reset()
     print("finish")
-
-
-
-
-
-

@@ -129,7 +129,7 @@ dic_traffic_env_conf = {
     "MEASURE_TIME": 10,
     "IF_GUI": True,
     "DEBUG": False,
-
+    "NUM_NEIGHBORS": 4,
     "INTERVAL": 1,
     "THREADNUM": 8,
     "SAVEREPLAY": True,

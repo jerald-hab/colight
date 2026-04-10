@@ -2,7 +2,7 @@ import sys
 sys.path.append("..")
 import numpy as np
 import os
-from agent import Agent
+from colight_pkg.agent import Agent
 import xml.etree.ElementTree as ET
 from math import ceil, floor
 import json

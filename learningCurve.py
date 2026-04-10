@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # CHANGE THIS to the experiment you want to plot
-base_path = "records/0404_Colight_6_6_bi/anon_6_6_300_0.3_bi.json_04_05_09_42_56/train_round"
+base_path = "records/0404_Colight_6_6_bi/anon_6_6_300_0.3_bi.json_04_08_18_24_35/train_round"
 round_numbers = []
 avg_queues = []
 
@@ -24,6 +24,11 @@ for round_name in round_dirs:
     for generator in os.listdir(round_path):
         gen_path = os.path.join(round_path, generator)
 
+        # ✅ Skip files like total_samples_inter_4.pkl
+        if not os.path.isdir(gen_path):
+            continue
+
+        # Now it's safe to list files inside the generator directory
         for f in os.listdir(gen_path):
             if f.startswith("inter_") and f.endswith(".pkl"):
                 full_path = os.path.join(gen_path, f)
@@ -41,6 +46,7 @@ for round_name in round_dirs:
 
                 rewards = [step["reward"] for step in data]
                 total_queue_all_intersections.append(np.mean(rewards))
+
 
     if total_queue_all_intersections:
         round_avg = np.mean(total_queue_all_intersections)

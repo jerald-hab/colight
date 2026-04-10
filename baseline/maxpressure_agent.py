@@ -1,8 +1,8 @@
 import sys
 
 sys.path.append("..")
-from agent import Agent
 import random
+from colight_pkg.agent import Agent
 import numpy as np
 
 

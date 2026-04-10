@@ -1,7 +1,7 @@
 import sys
 sys.path.append("..")
-from agent import Agent
 import random
+from colight_pkg.agent import Agent
 
 
 class RandomAgent(Agent):

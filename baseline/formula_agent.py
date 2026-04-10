@@ -2,8 +2,8 @@ import sys
 sys.path.append("..")
 import numpy as np
 import os
-from agent import Agent
 import xml.etree.ElementTree as ET
+from colight_pkg.agent import Agent
 from math import ceil, floor
 
 class FormulaAgent(Agent):

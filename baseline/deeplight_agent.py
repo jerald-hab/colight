@@ -17,8 +17,8 @@ from keras import backend as K
 import random
 from keras.engine.topology import Layer
 import os
-
-from agent import Agent
+from colight_pkg.agent import Agent
+##from agent import Agent
 
 class Selector(Layer):
 

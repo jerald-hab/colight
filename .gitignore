@@ -3,9 +3,9 @@ __pycache__/
 *.pyc
 *.pkl
 *.log
+*.txt
 *.png
 *.backup
-runexp6.py
 records/
 errors/
 temp.tensorboard/

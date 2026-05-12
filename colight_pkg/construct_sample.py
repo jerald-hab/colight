@@ -32,7 +32,7 @@ class ConstructSample:
 
     def load_data_for_system(self, folder):
         self.logging_data_list_per_gen = []
-        print("Load data for system in ", folder)
+        # print("Load data for system in ", folder)
         self.measure_time = self.dic_traffic_env_conf["MEASURE_TIME"]
         self.interval = self.dic_traffic_env_conf["MIN_ACTION_TIME"]
 
@@ -56,7 +56,7 @@ class ConstructSample:
         return 1
 
     def load_hidden_state_for_system(self, folder):
-        print("loading hidden states: {0}".format(os.path.join(self.path_to_samples, folder, "hidden_states.pkl")))
+        # print("loading hidden states: {0}".format(os.path.join(self.path_to_samples, folder, "hidden_states.pkl")))
         # load settings
         if self.hidden_states_list is None:
             self.hidden_states_list = []
@@ -65,7 +65,7 @@ class ConstructSample:
             f_hidden_state_data = open(os.path.join(self.path_to_samples, folder, "hidden_states.pkl"), "rb")
             hidden_state_data = pickle.load(f_hidden_state_data) # hidden state_data is a list of numpy array
             # print(hidden_state_data)
-            print(len(hidden_state_data))
+            # print(len(hidden_state_data))
             hidden_state_data_h_c = np.stack(hidden_state_data, axis=2)
             hidden_state_data_h_c = pd.Series(list(hidden_state_data_h_c))
             next_hidden_state_data_h_c = hidden_state_data_h_c.shift(-1)
@@ -203,8 +203,8 @@ class ConstructSample:
         if self.samples_all_intersection[i] is None:
             self.samples_all_intersection[i] = []
 
-        if i % 100 == 0:
-            print("make reward for inter {0} in folder {1}".format(i, folder))
+        # if i % 100 == 0:
+        #     print("make reward for inter {0} in folder {1}".format(i, folder))
 
         list_samples = []
 
@@ -246,7 +246,7 @@ class ConstructSample:
         :return:
         '''
         for folder in os.listdir(self.path_to_samples):
-            print(folder)
+            # print(folder)
             if "generator" not in folder:
                 continue
 
@@ -264,7 +264,7 @@ class ConstructSample:
 
     def dump_hidden_states(self, folder):
         total_hidden_states = np.vstack(self.hidden_states_list)
-        print("dump_hidden_states shape:",total_hidden_states.shape)
+        # print("dump_hidden_states shape:",total_hidden_states.shape)
         if folder == "":
             with open(os.path.join(self.parent_dir, "total_hidden_states.pkl"),"ab+") as f:
                 pickle.dump(total_hidden_states, f, -1)

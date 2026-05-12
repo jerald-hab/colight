@@ -1,15 +1,9 @@
 import copy
 from colight_pkg.pipeline import Pipeline
-import colight_pkg.config as config 
+import colight_pkg.config as config
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'   # hides TF C++ INFO/WARNING/ERROR logs
-
-import warnings
-warnings.filterwarnings("ignore")          # hides Python warnings (Deprecation, FutureWarning)
-
+####### code modification 1 JJ for forcing multi CPUs
 import tensorflow as tf
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)  # hides TF1 Python logs
-
 
 # Tell TF to use all CPUs allocated by SLURM
 # cpus = int(os.environ.get("SLURM_CPUS_PER_TASK", 1))
@@ -22,18 +16,22 @@ tf.compat.v1.disable_eager_execution()
 import time
 from multiprocessing import Process
 import argparse
-import os 
+import os
+import matplotlib
+import socket
+
+hostname = socket.gethostname()
+running_on_wulver = ("wulver" in hostname or "login" in hostname)
 # matplotlib.use('TkAgg')
 # import tensorflow as tf
 
 from script import get_traffic_volume
 tf.compat.v1.disable_eager_execution()
 
-
 TOP_K_ADJACENCY=-1
 TOP_K_ADJACENCY_LANE=-1
 PRETRAIN=False
-NUM_ROUNDS=40
+NUM_ROUNDS=100
 EARLY_STOP=False 
 NEIGHBOR=False
 SAVEREPLAY=False
@@ -44,20 +42,12 @@ ANON_PHASE_REPRE=[]
 def parse_args():
     parser = argparse.ArgumentParser()
     # The file folder to create/log in
-    parser.add_argument("--memo", type=str, default='0503_Colight_6_6_bi')#1_3,2_2,3_3,4_4
+    parser.add_argument("--memo", type=str, default='0410_Colight_10_10_bi')#1_3,2_2,3_3,4_4
     parser.add_argument("--env", type=int, default=1) #env=1 means you will run CityFlow
     parser.add_argument("--gui", type=bool, default=False)
-    parser.add_argument("--road_net", type=str, default='6_6')#'1_2') # which road net you are going to run
+    parser.add_argument("--road_net", type=str, default='10_10')#'1_2') # which road net you are going to run
     parser.add_argument("--volume", type=str, default='300')#'300'
     parser.add_argument("--suffix", type=str, default="0.3_bi")#0.3
- 
-    # # The file folder to create/log in
-    # parser.add_argument("--memo", type=str, default='0428_Colight_6_6_uni')#1_3,2_2,3_3,4_4
-    # parser.add_argument("--env", type=int, default=1) #env=1 means you will run CityFlow
-    # parser.add_argument("--gui", type=bool, default=False)
-    # parser.add_argument("--road_net", type=str, default='6_6')#'1_2') # which road net you are going to run
-    # parser.add_argument("--volume", type=str, default='300')#'300'
-    # parser.add_argument("--suffix", type=str, default="0.3_uni")#0.3
 
     global hangzhou_archive
     hangzhou_archive=False
@@ -65,8 +55,8 @@ def parse_args():
     TOP_K_ADJACENCY=5
     global TOP_K_ADJACENCY_LANE
     TOP_K_ADJACENCY_LANE=5
-    # global NUM_ROUNDS
-    # NUM_ROUNDS=5
+    global NUM_ROUNDS
+    NUM_ROUNDS=100
     global EARLY_STOP
     EARLY_STOP=False
     global NEIGHBOR
@@ -224,7 +214,7 @@ def main(memo, env, road_net, gui, volume, suffix, mod, cnt, gen, r_all, workers
     multi_process = True
 
     global PRETRAIN
-    # global NUM_ROUNDS
+    global NUM_ROUNDS
     global EARLY_STOP
     for traffic_file in traffic_file_list:
         dic_exp_conf_extra = {
@@ -325,10 +315,10 @@ def main(memo, env, road_net, gui, volume, suffix, mod, cnt, gen, r_all, workers
                 "lane_num_vehicle",
                 # "lane_num_vehicle_been_stopped_thres01",
                 # "lane_num_vehicle_been_stopped_thres1",
-                # "lane_queue_length", 
+                # "lane_queue_length",
                 # "lane_num_vehicle_left",
                 # "lane_sum_duration_vehicle_left",
-                # "lane_sum_waiting_time",   ##JJ
+                # "lane_sum_waiting_time",
                 # "terminal",
                 # "coming_vehicle",
                 # "leaving_vehicle",
@@ -369,14 +359,12 @@ def main(memo, env, road_net, gui, volume, suffix, mod, cnt, gen, r_all, workers
             "DIC_REWARD_INFO": {
                 "flickering": 0,#-5,#
                 "sum_lane_queue_length": 0,
-                "sum_lane_wait_time": -0.1,
+                "sum_lane_wait_time": 0,
                 "sum_lane_num_vehicle_left": 0,#-1,#
                 "sum_duration_vehicle_left": 0,
                 "sum_num_vehicle_been_stopped_thres01": 0,
                 "sum_num_vehicle_been_stopped_thres1": 0, #-0.25,
-                "pressure": -0.25,
-                "vehicles_exited": 0.1,
-                "lane_num_vehicle_been_stopped_thres1": -0.1 ##JJ newly added
+                "pressure": -0.25
             },
 
             "LANE_NUM": {
@@ -503,9 +491,13 @@ def main(memo, env, road_net, gui, volume, suffix, mod, cnt, gen, r_all, workers
         print(traffic_file)
         prefix_intersections = str(road_net)
 
-        if args.road_net == "10_10":
-            pathtoData = "/home/jj668/colight_data/10_10"
+
+        if running_on_wulver:
+            # Wulver GPFS dataset
+            if args.road_net == "10_10":
+                pathtoData = "/home/jj668/colight_data/10_10"
         else:
+            # Local dataset
             pathtoData = os.path.join("data", "template_lsr", args.road_net)
 
         dic_path_extra = {

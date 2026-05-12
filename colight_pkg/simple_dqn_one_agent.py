@@ -55,7 +55,7 @@ class SimpleDQNOneAgent(NetworkAgent):
                         outputs=q_values)
         network.compile(optimizer=RMSprop(lr=self.dic_agent_conf["LEARNING_RATE"]),
                         loss=self.dic_agent_conf["LOSS_FUNCTION"])
-        network.summary()
+        # network.summary()
 
         return network
 

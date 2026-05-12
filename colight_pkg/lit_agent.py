@@ -78,6 +78,6 @@ class LitAgent(NetworkAgent):
                         outputs=q_values)
         network.compile(optimizer=RMSprop(lr=self.dic_agent_conf["LEARNING_RATE"]),
                         loss="mean_squared_error")
-        network.summary()
+        # network.summary()
 
         return network

@@ -77,9 +77,9 @@ class CoLightAgent(Agent):
         # self.num_actions = len(self.list_phases)   # CityFlow’s actual phase list
         sim = self.dic_traffic_env_conf["SIMULATOR_TYPE"]
         # self.num_actions = len(self.dic_traffic_env_conf["PHASE"][sim])
-        print("Corrected num_actions:", self.num_actions)
-        print("Agent num_actions:", self.num_actions)
-        print("Env valid phases:", self.DIC_PHASE_MAP.keys())
+        # print("Corrected num_actions:", self.num_actions)
+        # print("Agent num_actions:", self.num_actions)
+        # print("Env valid phases:", self.DIC_PHASE_MAP.keys())
         self.num_lanes = np.sum(np.array(list(self.dic_traffic_env_conf["LANE_NUM"].values())))
         self.len_feature=32 #self.compute_len_feature()
         self.memory = self.build_memory()
@@ -138,8 +138,8 @@ class CoLightAgent(Agent):
                             max(cnt_round - self.dic_agent_conf["UPDATE_Q_BAR_FREQ"], 0),
                             self.intersection_id))
 
-            except:
-                print("fail to load network, current round: {0}".format(cnt_round))
+            except: 
+                # print("fail to load network, current round: {0}".format(cnt_round))
                 # 🔥 FALLBACK: build fresh networks so q_network always exists
                 self.q_network = self.build_network()
                 self.q_network_bar = self.build_network_from_copy(self.q_network)
@@ -156,7 +156,7 @@ class CoLightAgent(Agent):
                 "round_-1_inter_{0}.h5".format(intersection_id))):
             #the 0-th model is pretrained model
             self.dic_agent_conf["EPSILON"] = self.dic_agent_conf["MIN_EPSILON"]
-            print('round%d, EPSILON:%.4f'%(cnt_round,self.dic_agent_conf["EPSILON"]))
+            # print('round%d, EPSILON:%.4f'%(cnt_round,self.dic_agent_conf["EPSILON"]))
         else:
             decayed_epsilon = self.dic_agent_conf["EPSILON"] * pow(self.dic_agent_conf["EPSILON_DECAY"], cnt_round)
             self.dic_agent_conf["EPSILON"] = max(decayed_epsilon, self.dic_agent_conf["MIN_EPSILON"])
@@ -216,7 +216,7 @@ class CoLightAgent(Agent):
         """
         agent repr
         """
-        print("In_agent.shape,In_neighbor.shape,l, d, dv, dout, nv", In_agent.shape,In_neighbor.shape,l, d, dv, dout, nv)
+        # print("In_agent.shape,In_neighbor.shape,l, d, dv, dout, nv", In_agent.shape,In_neighbor.shape,l, d, dv, dout, nv)
         #[batch,agent,dim]->[batch,agent,1,dim]
         agent_repr=Reshape((self.num_agents,1,d))(In_agent)
 
@@ -225,10 +225,10 @@ class CoLightAgent(Agent):
         """
         #[batch,agent,dim]->(reshape)[batch,1,agent,dim]->(tile)[batch,agent,agent,dim]
         neighbor_repr=RepeatVector3D(self.num_agents)(In_agent)
-        print("neighbor_repr.shape", neighbor_repr.shape)
+        # print("neighbor_repr.shape", neighbor_repr.shape)
         #[batch,agent,neighbor,agent]x[batch,agent,agent,dim]->[batch,agent,neighbor,dim]
         neighbor_repr=Lambda(lambda x:K.batch_dot(x[0],x[1]))([In_neighbor,neighbor_repr])
-        print("neighbor_repr.shape", neighbor_repr.shape)
+        # print("neighbor_repr.shape", neighbor_repr.shape)
         """
         attention computation
         """
@@ -243,8 +243,8 @@ class CoLightAgent(Agent):
 
         neighbor_repr_head=Dense(dv*nv,activation='relu',kernel_initializer='random_normal',name='neighbor_repr_%d'%suffix)(neighbor_repr)
         #[batch,agent,neighbor,dv,nv]->[batch,agent,nv,neighbor,dv]
-        print("DEBUG",neighbor_repr_head.shape)
-        print("self.num_agents,self.num_neighbors,dv,nv", self.num_agents,self.num_neighbors,dv,nv)
+        # print("DEBUG",neighbor_repr_head.shape)
+        # print("self.num_agents,self.num_neighbors,dv,nv", self.num_agents,self.num_neighbors,dv,nv)
         neighbor_repr_head=Reshape((self.num_agents,self.num_neighbors,dv,nv))(neighbor_repr_head)
         neighbor_repr_head=Lambda(lambda x:K.permute_dimensions(x,(0,1,4,2,3)))(neighbor_repr_head)
         #neighbor_repr_head=Lambda(lambda x:K.permute_dimensions(K.reshape(x,(-1,self.num_agents,self.num_neighbors,dv,nv)),(0,1,4,2,3)))(neighbor_repr_head)        
@@ -372,7 +372,7 @@ class CoLightAgent(Agent):
         
         """
         ind_end = len(memory)
-        print("memory size before forget: {0}".format(ind_end))
+        # print("memory size before forget: {0}".format(ind_end))
         # use all the samples to pretrain, i.e., without forgetting
         if dic_exp_conf["PRETRAIN"] or dic_exp_conf["AGGREGATE"]:
             sample_slice = memory
@@ -380,12 +380,12 @@ class CoLightAgent(Agent):
         else:
             ind_sta = max(0, ind_end - self.dic_agent_conf["MAX_MEMORY_LEN"])
             memory_after_forget = memory[ind_sta: ind_end]
-            print("memory size after forget:", len(memory_after_forget))
+            # print("memory size after forget:", len(memory_after_forget))
 
             # sample the memory
             sample_size = min(self.dic_agent_conf["SAMPLE_SIZE"], len(memory_after_forget))
             sample_slice = random.sample(memory_after_forget, sample_size)
-            print("memory samples number:", sample_size)
+            # print("memory samples number:", sample_size)
 
         _state = []
         _next_state = []
@@ -463,15 +463,15 @@ class CoLightAgent(Agent):
         """
         feature=self.MLP(In[0],MLP_layers)
 
-        Embedding_end_time=time.time()
+        # Embedding_end_time=time.time()
 
-        print("ACTION LAYER SHAPE:", self.num_actions)
+        # print("ACTION LAYER SHAPE:", self.num_actions)
         #TODO: remove the dense setting
         #feature:[batch,agents,feature_dim]
         att_record_all_layers=list()
-        print("CNN_heads:", CNN_heads)
+        # print("CNN_heads:", CNN_heads)
         for CNN_layer_index,CNN_layer_size in enumerate(CNN_layers):
-            print("CNN_heads[CNN_layer_index]:",CNN_heads[CNN_layer_index])
+            # print("CNN_heads[CNN_layer_index]:",CNN_heads[CNN_layer_index])
             if CNN_layer_index==0:
                 h,att_record=self.MultiHeadsAttModel(
                     feature,
@@ -526,11 +526,11 @@ class CoLightAgent(Agent):
                 loss=self.dic_agent_conf["LOSS_FUNCTION"],
                 loss_weights=[1,0])
         # model.compile(optimizer=Adam(lr = 0.0001), loss='mse')
-        model.summary()
-        network_end=time.time()
-        print('build_Input_end_time：',Input_end_time-start_time)
-        print('embedding_time:',Embedding_end_time-Input_end_time)
-        print('total time:',network_end-start_time)
+        # model.summary()
+        # network_end=time.time()
+        # print('build_Input_end_time：',Input_end_time-start_time)
+        # print('embedding_time:',Embedding_end_time-Input_end_time)
+        # print('total time:',network_end-start_time)
         return model
 
     def build_memory(self):
@@ -553,7 +553,7 @@ class CoLightAgent(Agent):
         #                           verbose=2, validation_split=0.3, callbacks=[early_stopping])
         hist = self.q_network.fit(self.Xs, self.Y_total, batch_size=batch_size, epochs=epochs,
                                   shuffle=False,
-                                  verbose=2, validation_split=0.3,
+                                  verbose=0, validation_split=0.3,
                                   callbacks=[early_stopping,TensorBoard(log_dir='./temp.tensorboard')])
 
     def build_network_from_copy(self, network_copy):
@@ -584,7 +584,7 @@ class CoLightAgent(Agent):
         self.q_network = load_model(
             os.path.join(file_path, "%s.h5" % file_name),
             custom_objects={'RepeatVector3D':RepeatVector3D})
-        print("succeed in loading model %s"%file_name)
+        # print("succeed in loading model %s"%file_name)
 
     def load_network_bar(self, file_name, file_path=None):
         if file_path == None:
@@ -592,7 +592,7 @@ class CoLightAgent(Agent):
         self.q_network_bar = load_model(
             os.path.join(file_path, "%s.h5" % file_name),
             custom_objects={'RepeatVector3D':RepeatVector3D})
-        print("succeed in loading model %s"%file_name) 
+        # print("succeed in loading model %s"%file_name) 
 
     def save_network(self, file_name):
         self.q_network.save(os.path.join(self.dic_path["PATH_TO_MODEL"], "%s.h5" % file_name))

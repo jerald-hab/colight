@@ -176,8 +176,8 @@ class Updater:
 
             print("traceback.format_exc():\n%s" % traceback.format_exc())
 
-        if i % 100 == 0:
-            print(f"load_sample for inter {i}")
+        # if i % 100 == 0:
+        #     print(f"load_sample for inter {i}")
 
         return sample_set
 
@@ -337,14 +337,14 @@ class Updater:
 
             print("traceback.format_exc():\n%s" % traceback.format_exc())
 
-        if i % 100 == 0:
-            print(f"load_sample_with_forget for inter {i}")
+        # if i % 100 == 0:
+        #     print(f"load_sample_with_forget for inter {i}")
 
         return sample_set
 
     def load_sample_for_agents(self):
-        start_time = time.time()
-        print("Start load samples at", start_time)
+        # start_time = time.time()
+        # print("Start load samples at", start_time)
 
         # ---------------------------------------------------------
         # NON-GCN / NON-CoLight MODELS
@@ -380,7 +380,7 @@ class Updater:
         # GCN / CoLight MODELS
         # ---------------------------------------------------------
         else:
-            print("start get samples")
+            # print("start get samples")
             get_samples_start_time = time.time()
 
             samples_gcn_df = []
@@ -408,8 +408,8 @@ class Updater:
 
                 samples_gcn_df.append(samples_set_df['input'])
 
-                if i % 100 == 0:
-                    print(f"inter {i} samples_set_df.shape: {samples_set_df.shape}")
+                # if i % 100 == 0:
+                #     print(f"inter {i} samples_set_df.shape: {samples_set_df.shape}")
 
             if len(samples_gcn_df) == 0:
                 print("[WARN] No samples found for any intersection")
@@ -417,18 +417,18 @@ class Updater:
 
             samples_gcn_df = pd.concat(samples_gcn_df, axis=1)
 
-            print("samples_gcn_df.shape :", samples_gcn_df.shape)
-            print("Getting samples time: ", time.time() - get_samples_start_time)
+            # print("samples_gcn_df.shape :", samples_gcn_df.shape)
+            # print("Getting samples time: ", time.time() - get_samples_start_time)
 
             # Shared agent for CoLight/GCN
             for i in range(self.dic_traffic_env_conf['NUM_AGENTS']):
                 sample_set_list = samples_gcn_df.values.tolist()
                 self.agents[i].prepare_Xs_Y(sample_set_list, self.dic_exp_conf)
 
-        print("------------------Load samples time: ", time.time() - start_time)
+        # print("------------------Load samples time: ", time.time() - start_time)
 
     def sample_set_to_sample_gcn_df(self,sample_set):
-        print("make results")
+        # print("make results")
         samples_set_df = pd.DataFrame.from_records(sample_set,columns= ['state','action','next_state','inst_reward','reward','time','generator'])
         samples_set_df = samples_set_df.set_index(['time','generator'])
         samples_set_df['input'] = samples_set_df[['state','action','next_state','inst_reward','reward']].values.tolist()
@@ -448,7 +448,7 @@ class Updater:
 
 
     def update_network(self,i):
-        print('update agent %d'%i)
+        # print('update agent %d'%i)
         self.agents[i].train_network(self.dic_exp_conf)
         if self.dic_traffic_env_conf["ONE_MODEL"]:
             if self.dic_exp_conf["PRETRAIN"]:
@@ -486,7 +486,7 @@ class Updater:
         if self.dic_traffic_env_conf["ONE_MODEL"]:
             self.update_network(0)
         else:
-            print("update_network_for_agents", self.dic_traffic_env_conf['NUM_AGENTS'])
+            # print("update_network_for_agents", self.dic_traffic_env_conf['NUM_AGENTS'])
             for i in range(self.dic_traffic_env_conf['NUM_AGENTS']):
                 self.update_network(i)
 

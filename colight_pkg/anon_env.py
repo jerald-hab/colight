@@ -156,6 +156,7 @@ class Intersection:
         self.inter_id = inter_id
 
         self.inter_name = "intersection_{0}_{1}".format(inter_id[0], inter_id[1])
+        self.blocked_lanes = []
 
         self.eng = eng
 
@@ -198,7 +199,7 @@ class Intersection:
         # ✅ Use NUM_PHASES for control, not len(PHASE dict)
         num_phases = dic_traffic_env_conf["NUM_PHASES"]          # 9
         self.DIC_PHASE_MAP = {i: i for i in range(num_phases)}   # 0..8
-        print("INTERSECTION DIC_PHASE_MAP:", self.DIC_PHASE_MAP)
+        # print("INTERSECTION DIC_PHASE_MAP:", self.DIC_PHASE_MAP)
         # generate all lanes
         self.list_entering_lanes = []
         for approach in self.list_approachs:
@@ -253,6 +254,8 @@ class Intersection:
 
         self.list_lane_vehicle_previous_step = []
         self.list_lane_vehicle_current_step = []
+        # Track vehicles per lane across steps
+        self.dic_lane_vehicles_last_step = {lane: set() for lane in self.list_entering_lanes}##JJ new line delete if error
 
         # -1: all yellow, -2: all red, -3: none
         self.all_yellow_phase_index = -1
@@ -278,6 +281,12 @@ class Intersection:
 
         self.dic_feature = {}  # this second
         self.dic_feature_previous_step = {}  # this second
+
+    def _get_lane_vehicle_ids(self, lane):  ##new method ..delete if error JJ
+        # simulator_state stores vehicles per lane
+        # each vehicle has an ID and position
+        return set(self.dic_lane_vehicle_current_step[lane])
+    
 
     def build_adjacency_row_lane(self, lane_id_to_global_index_dict):
         self.adjacency_row_lanes = [] # order is the entering lane order, each element is list of two lists
@@ -557,6 +566,7 @@ class Intersection:
         dic_feature["lane_num_vehicle_left"] = None
         dic_feature["lane_sum_duration_vehicle_left"] = None
         dic_feature["lane_sum_waiting_time"] = None #self._get_lane_sum_waiting_time(self.list_entering_lanes)
+        # dic_feature["lane_sum_waiting_time"] =self._get_lane_sum_waiting_time(self.list_entering_lanes) ##JJ
         dic_feature["terminal"] = None
 
 
@@ -648,11 +658,24 @@ class Intersection:
         '''
         return [self.dic_lane_waiting_vehicle_count_current_step[lane] for lane in list_lanes]
 
+    # def _get_lane_num_vehicle(self, list_lanes):
+    #     '''
+    #     vehicle number for each lane
+    #     '''
+    #     return [len(self.dic_lane_vehicle_current_step[lane]) for lane in list_lanes]
+
     def _get_lane_num_vehicle(self, list_lanes):
-        '''
-        vehicle number for each lane
-        '''
-        return [len(self.dic_lane_vehicle_current_step[lane]) for lane in list_lanes]
+        counts = []
+        for lane in list_lanes:
+            if lane in self.blocked_lanes:
+                counts.append(999)
+                # print("blocked lane!!!!!!")
+            else:
+                counts.append(len(self.dic_lane_vehicle_current_step[lane]))
+        return counts
+
+
+
 
     def _get_connectivity(self, dic_of_list_lanes):
         '''
@@ -679,13 +702,30 @@ class Intersection:
         '''
         raise NotImplementedError
 
-    def _get_lane_list_vehicle_left(self, list_lanes):
-        '''
-        get list of vehicles left at each lane
-        ####### need to check
-        '''
+    # def _get_lane_list_vehicle_left(self, list_lanes):
+    #     '''
+    #     get list of vehicles left at each lane
+    #     ####### need to check
+    #     '''
 
-        raise NotImplementedError
+    #     raise NotImplementedError
+    def _get_lane_list_vehicle_left(self, list_lanes): ##JJ new ..revert if issues to above
+        list_lane_vehicle_left = []
+
+        for lane in list_lanes:
+            last = self.dic_lane_vehicles_last_step.get(lane, set())
+            current = self._get_lane_vehicle_ids(lane)
+
+            # vehicles that disappeared since last step
+            exited = last - current
+
+            # update memory
+            self.dic_lane_vehicles_last_step[lane] = current
+
+            list_lane_vehicle_left.append(exited)
+
+        return list_lane_vehicle_left
+
 
     # non temporary
     def _get_lane_num_vehicle_left(self, list_lanes):
@@ -786,20 +826,26 @@ class Intersection:
         return dic_state
     
     def get_reward(self, dic_reward_info):
-        dic_reward = dict()
-
+        dic_reward = dict() 
         # compute pressure
         pressure = np.sum(self.dic_feature["lane_num_vehicle"])
-
+        vehicles_exited = 0##sum(self._get_lane_num_vehicle_left(self.list_entering_lanes))##JJ new
+        # stopped = np.sum(self.dic_feature["lane_num_vehicle_been_stopped_thres1"]) ##JJ new
         # set all unused rewards to 0 instead of None
         dic_reward["flickering"] = 0
-        dic_reward["sum_lane_queue_length"] = 0
+        dic_reward["sum_lane_queue_length"] = 0  
+        dic_reward["lane_num_vehicle_been_stopped_thres1"] = 0 ##stopped ##JJ
         dic_reward["sum_lane_wait_time"] = 0
         dic_reward["sum_lane_num_vehicle_left"] = 0
         dic_reward["sum_duration_vehicle_left"] = 0
         dic_reward["sum_num_vehicle_been_stopped_thres01"] = 0
         dic_reward["sum_num_vehicle_been_stopped_thres1"] = 0
         dic_reward["pressure"] = pressure
+        dic_reward["vehicles_exited"] = vehicles_exited
+
+        # print("Reward weights at runtime:", dic_reward_info)
+        # print("Reward stopped:", stopped)
+
 
         reward = 0
         for r in dic_reward_info:
@@ -852,7 +898,10 @@ class AnonEnv:
         self.list_lanes = None
         self.system_states = None
         self.feature_name_for_neighbor = self._reduce_duplicates(self.dic_traffic_env_conf["LIST_STATE_FEATURE"])
-
+        self.file_check_counter = 0  ##JJ new 3 variables for traffic jam
+        self.event_flag = 0
+        self.event_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "event.txt")
+        # print("self.event_file_path=",self.event_file_path)
         # check min action time
         if self.dic_traffic_env_conf["MIN_ACTION_TIME"] <= self.dic_traffic_env_conf["YELLOW_TIME"]:
             print ("MIN_ACTION_TIME should include YELLOW_TIME")
@@ -867,7 +916,7 @@ class AnonEnv:
 
     def reset(self):
 
-        print("# self.eng.reset() to be implemented")
+        # print("# self.eng.reset() to be implemented")
         cityflow_config = {
             "interval": self.dic_traffic_env_conf["INTERVAL"],
             "seed": 0,
@@ -894,8 +943,8 @@ class AnonEnv:
         #     "roadnetLogFile": "frontend/web/roadnetLogFile.json",
         #     "replayLogFile": "frontend/web/replayLogFile.txt"
         # }
-        print("==========cityflow_config===============")
-        print(cityflow_config)
+        # print("==========cityflow_config===============")
+        # print(cityflow_config)
 
         # Write the generated config
         config_path = os.path.join(self.path_to_work_directory, "cityflow.config")
@@ -904,14 +953,14 @@ class AnonEnv:
         # Now create the engine        
         for _ in range(5):
             try:
-                print(">>> ENGINE CONFIG PATH:", config_path)
+                # print(">>> ENGINE CONFIG PATH:", config_path)
                 self.eng = engine.Engine(config_path, thread_num=1)
                 break
             except:
                 time.sleep(0.2)
         # self.eng = engine.Engine(config_path, thread_num=1)
-        print(">>> WORK DIRECTORY:", self.path_to_work_directory)
-        print(">>> Writing CityFlow config to:", config_path) 
+        # print(">>> WORK DIRECTORY:", self.path_to_work_directory)
+        # print(">>> Writing CityFlow config to:", config_path) 
         # get adjacency
         if self.dic_traffic_env_conf["USE_LANE_ADJACENCY"]:
             self.traffic_light_node_dict = self._adjacency_extraction_lane()
@@ -943,7 +992,7 @@ class AnonEnv:
                 if lane_id not in self.lane_id_to_index.keys():
                     self.lane_id_to_index[lane_id] = count_lane
                     count_lane += 1
-
+        # print(">>> NUM INTERSECTIONS:", len(self.list_intersection))
         # build adjacency_matrix_lane in index from _adjacency_matrix_lane
         for inter in self.list_intersection:
             inter.build_adjacency_row_lane(self.lane_id_to_index)
@@ -963,15 +1012,15 @@ class AnonEnv:
                               "get_vehicle_speed": self.eng.get_vehicle_speed(),
                               "get_vehicle_distance": self.eng.get_vehicle_distance()
                               }
-        print("Get system state time: ", time.time()-system_state_start_time)
+        # print("Get system state time: ", time.time()-system_state_start_time)
 
         update_start_time = time.time()
         for inter in self.list_intersection:
             inter.update_current_measurements_map(self.system_states)
-        print("Update_current_measurements_map time: ", time.time()-update_start_time)
+        # print("Update_current_measurements_map time: ", time.time()-update_start_time)
 
         #update neighbor's info
-        neighbor_start_time = time.time()
+        # neighbor_start_time = time.time()
         if self.dic_traffic_env_conf["NEIGHBOR"]:
             for inter in self.list_intersection:
                 neighbor_inter_ids = inter.neighbor_ENWS
@@ -982,16 +1031,52 @@ class AnonEnv:
                     else:
                         neighbor_inters.append(None)
                 inter.dic_feature = inter.update_neighbor_info(neighbor_inters,deepcopy(inter.dic_feature))
-        print("Update_neighbor time: ", time.time()-neighbor_start_time)
+        # print("Update_neighbor time: ", time.time()-neighbor_start_time)
 
         state, done = self.get_state()
         # print(state)
         return state
 
     def step(self, action):
-        step_start_time = time.time()
+        # step_start_time = time.time()
         list_action_in_sec = [action]
         list_action_in_sec_display = [action]
+        #  dynamic event trigger (check file every 10 steps)
+        self.file_check_counter += 1
+        event_flag = 0
+        # Read event flag every step (cheap)   Only accident simulation
+        if self.file_check_counter%60 == 0:
+            try:
+                with open(self.event_file_path) as f:
+                    raw = f.read().strip()
+                    clean = ''.join(c for c in raw if c.isdigit())
+                    event_flag = int(clean) if clean else 0
+                    # print("RAW:", repr(raw), " CLEAN:", clean, " FLAG:", event_flag)
+
+                    if event_flag == 1 and self.path_to_log.endswith("generator_0"): ##and self.event_flag == 0:
+                        print("ACCIDENT DETECTED!!! LANE 3,4 CLOSED!!")   
+                    elif event_flag == 0:
+                        print("!!! ALL LANES OPEN!!")    
+            except Exception as e:
+                    print("exception in reading event file!!!", e)
+                    import traceback
+                    traceback.print_exc()
+                    event_flag = 0 
+
+        # Accident window
+        if event_flag == 1: ##and 100 <= self.file_check_counter <= 160:
+            # Accident active
+            for inter in self.list_intersection:
+                if inter.inter_name in ["intersection_3_3", "intersection_3_4"]:
+                    inter.blocked_lanes = inter.list_entering_lanes
+                else:
+                    inter.blocked_lanes = []  
+        else:
+            # Accident inactive
+            for inter in self.list_intersection:
+                inter.blocked_lanes = []             
+        #### end of dynamic event 
+            
         for i in range(self.dic_traffic_env_conf["MIN_ACTION_TIME"]-1):
             if self.dic_traffic_env_conf["ACTION_PATTERN"] == "switch":
                 list_action_in_sec.append(np.zeros_like(action).tolist())
@@ -1018,13 +1103,13 @@ class AnonEnv:
             self._inner_step(action_in_sec)
 
             # get reward
-            if self.dic_traffic_env_conf['DEBUG']:
-                start_time = time.time()
+            # if self.dic_traffic_env_conf['DEBUG']:
+            #     start_time = time.time()
             #print("DEBUG lane_num_vehicle:", self.dic_feature["lane_num_vehicle"])
             reward = self.get_reward()
 
-            if self.dic_traffic_env_conf['DEBUG']:
-                print("Reward time: {}".format(time.time()-start_time))
+            # if self.dic_traffic_env_conf['DEBUG']:
+            #     print("Reward time: {}".format(time.time()-start_time))
 
             for j in range(len(reward)):
                 average_reward_action_list[j] = (average_reward_action_list[j] * i + reward[j]) / (i + 1)
@@ -1036,7 +1121,11 @@ class AnonEnv:
 
             next_state, done = self.get_state()
             #next_state = [self.get_state()] 
-
+            # print("DEBUG shapes:",
+            #     len(before_action_feature) if hasattr(before_action_feature, "__len__") else "scalar",
+            #     len(action) if hasattr(action, "__len__") else "scalar",
+            #     len(reward) if hasattr(reward, "__len__") else "scalar",
+            #     len(next_state) if hasattr(next_state, "__len__") else "scalar")
             self.log(
                 cur_time=instant_time,
                 before_action_feature=before_action_feature,
@@ -1087,14 +1176,14 @@ class AnonEnv:
 
         # print("Get system state time: ", time.time()-system_state_start_time)
 
-        if self.dic_traffic_env_conf['DEBUG']:
-            print("Get system state time: {}".format(time.time()-start_time))
-        # get new measurements
+        # if self.dic_traffic_env_conf['DEBUG']:
+        #     print("Get system state time: {}".format(time.time()-start_time))
+        # # get new measurements
 
-        if self.dic_traffic_env_conf['DEBUG']:
-            start_time = time.time()
+        # if self.dic_traffic_env_conf['DEBUG']:
+        #     start_time = time.time()
 
-        update_start_time = time.time()
+        # update_start_time = time.time()
         for inter in self.list_intersection:
             inter.update_current_measurements_map(self.system_states)
 
@@ -1113,8 +1202,8 @@ class AnonEnv:
 
         # print("Update_current_measurements_map time: ", time.time()-update_start_time)
 
-        if self.dic_traffic_env_conf['DEBUG']:
-            print("Update measurements time: {}".format(time.time()-start_time))
+        # if self.dic_traffic_env_conf['DEBUG']:
+        #     print("Update measurements time: {}".format(time.time()-start_time))
         # aggregate features across intersections
         self.dic_feature = {}
         self.dic_feature["lane_num_vehicle"] = np.concatenate(
@@ -1125,21 +1214,21 @@ class AnonEnv:
         #self.log_phase()
 
     def load_roadnet(self, roadnetFile=None):
-        print("Start load roadnet")
+        # print("Start load roadnet")
         start_time = time.time()
         if not roadnetFile:
             roadnetFile = "roadnet_1_1.json"
         #print("/n/n", os.path.join(self.path_to_work_directory, roadnetFile))
         self.eng.load_roadnet(os.path.join(self.path_to_work_directory, roadnetFile))
-        print("successfully load roadnet:{0}, time: {1}".format(roadnetFile,time.time()-start_time))
+        # print("successfully load roadnet:{0}, time: {1}".format(roadnetFile,time.time()-start_time))
 
     def load_flow(self, flowFile=None):
-        print("Start load flowFile")
+        # print("Start load flowFile")
         start_time = time.time()
         if not flowFile:
             flowFile = "flow_1_1.json"
         self.eng.load_flow(os.path.join(self.path_to_work_directory, flowFile))
-        print("successfully load flowFile: {0}, time: {1}".format(flowFile, time.time()-start_time))
+        # print("successfully load flowFile: {0}, time: {1}".format(flowFile, time.time()-start_time))
 
     def _check_episode_done(self, list_state):
 
@@ -1203,19 +1292,35 @@ class AnonEnv:
                 "next_state": next_state[inter_ind]
             })
 
+    # def batch_log(self, start, stop):
+    #     for inter_ind in range(start, stop):
+    #         if int(inter_ind)%100 == 0:
+    #             print("Batch log for inter ",inter_ind)
+    #         path_to_log_file = os.path.join(self.path_to_log, "vehicle_inter_{0}.csv".format(inter_ind))
+    #         dic_vehicle = self.list_intersection[inter_ind].get_dic_vehicle_arrive_leave_time()
+    #         df = pd.DataFrame.from_dict(dic_vehicle,orient='index')
+    #         df.to_csv(path_to_log_file, na_rep="nan")
+
+    #         path_to_log_file = os.path.join(self.path_to_log, "inter_{0}.pkl".format(inter_ind))
+    #         f = open(path_to_log_file, "wb")
+    #         pickle.dump(self.list_inter_log[inter_ind], f)
+    #         f.close()
     def batch_log(self, start, stop):
         for inter_ind in range(start, stop):
-            if int(inter_ind)%100 == 0:
-                print("Batch log for inter ",inter_ind)
-            path_to_log_file = os.path.join(self.path_to_log, "vehicle_inter_{0}.csv".format(inter_ind))
-            dic_vehicle = self.list_intersection[inter_ind].get_dic_vehicle_arrive_leave_time()
-            df = pd.DataFrame.from_dict(dic_vehicle,orient='index')
-            df.to_csv(path_to_log_file, na_rep="nan")
+            try:
+                # if int(inter_ind) % 100 == 0:
+                #     print("Batch log for inter", inter_ind)
 
-            path_to_log_file = os.path.join(self.path_to_log, "inter_{0}.pkl".format(inter_ind))
-            f = open(path_to_log_file, "wb")
-            pickle.dump(self.list_inter_log[inter_ind], f)
-            f.close()
+                path_to_log_file = os.path.join(self.path_to_log, f"vehicle_inter_{inter_ind}.csv")
+                dic_vehicle = self.list_intersection[inter_ind].get_dic_vehicle_arrive_leave_time()
+                df = pd.DataFrame.from_dict(dic_vehicle, orient='index')
+                df.to_csv(path_to_log_file, na_rep="nan")
+
+                path_to_log_file = os.path.join(self.path_to_log, f"inter_{inter_ind}.pkl")
+                with open(path_to_log_file, "wb") as f:
+                    pickle.dump(self.list_inter_log[inter_ind], f)
+            except Exception as e:
+                print("ERROR in batch_log for inter", inter_ind, ":", repr(e))
 
     def bulk_log_multi_process(self, batch_size=100):
         assert len(self.list_intersection) == len(self.list_inter_log)
@@ -1228,16 +1333,16 @@ class AnonEnv:
             start = batch
             stop = min(batch + batch_size, len(self.list_intersection))
             p = Process(target=self.batch_log, args=(start,stop))
-            print("before")
+            # print("before")
             p.start()
-            print("end")
+            # print("end")
             process_list.append(p)
-        print("before join")
+        # print("before join")
 
         for t in process_list:
             t.join()
 
-        print("end join")
+        # print("end join")
 
     def bulk_log(self):
 
@@ -1270,22 +1375,22 @@ class AnonEnv:
         with open(path_to_log_file, "wb") as f:
             pickle.dump(hidden_states, f)
 
-    def log_lane_vehicle_position(self):
-        def list_to_str(alist):
-            new_str = ""
-            for s in alist:
-                new_str = new_str + str(s) + " "
-            return new_str
-        dic_lane_map = {
-            "road_0_1_0_0": "w",
-            "road_2_1_2_0": "e",
-            "road_1_0_1_0": "s",
-            "road_1_2_3_0": "n"
-        }
-        for inter in self.list_intersection:
-            for lane in inter.list_entering_lanes:
-                print(str(self.get_current_time()) + ", " + lane + ", " + list_to_str(inter._get_lane_vehicle_position([lane])[0]),
-                      file=open(os.path.join(self.path_to_log, "lane_vehicle_position_%s.txt"%dic_lane_map[lane]), "a"))
+    # def log_lane_vehicle_position(self):
+        # def list_to_str(alist):
+        #     new_str = ""
+        #     for s in alist:
+        #         new_str = new_str + str(s) + " "
+        #     return new_str
+        # dic_lane_map = {
+        #     "road_0_1_0_0": "w",
+        #     "road_2_1_2_0": "e",
+        #     "road_1_0_1_0": "s",
+        #     "road_1_2_3_0": "n"
+        # }
+        # for inter in self.list_intersection:
+        #     for lane in inter.list_entering_lanes:
+        #         print(str(self.get_current_time()) + ", " + lane + ", " + list_to_str(inter._get_lane_vehicle_position([lane])[0]),
+        #               file=open(os.path.join(self.path_to_log, "lane_vehicle_position_%s.txt"%dic_lane_map[lane]), "a"))
 
     def log_lane_vehicle_position(self):
         def list_to_str(alist):
@@ -1368,7 +1473,7 @@ class AnonEnv:
 
         with open(file) as json_data:
             net = json.load(json_data)
-            print("jj net >><<")
+            # print("jj net >><<")
             for inter in net['intersections']:
                 if not inter['virtual']:
                     traffic_light_node_dict[inter['id']] = {'location': {'x': float(inter['point']['x']),
@@ -1591,7 +1696,7 @@ class AnonEnv:
         return np.sqrt(np.sum((a-b)**2))
 
     def end_sumo(self):
-        print("anon process end")
+        # print("anon process end")
         pass
 
 if __name__ == '__main__':
@@ -1691,7 +1796,7 @@ if __name__ == '__main__':
                 # "lane_queue_length",
                 # "lane_num_vehicle_left",
                 # "lane_sum_duration_vehicle_left",
-                # "lane_sum_waiting_time",
+                "lane_sum_waiting_time",  ##JJ
                 # "terminal",
                 # "coming_vehicle",
                 # "leaving_vehicle",
@@ -1734,7 +1839,7 @@ if __name__ == '__main__':
                 "sum_duration_vehicle_left": 0,
                 "sum_num_vehicle_been_stopped_thres01": 0,
                 "sum_num_vehicle_been_stopped_thres1": -0.25,
-                "pressure": 0  # -0.25
+                "pressure": -0.25
             },
 
             "LANE_NUM": {
@@ -1743,7 +1848,7 @@ if __name__ == '__main__':
                 "STRAIGHT": 1
             },
 
-            "PHASE": {
+            "PHASE": { 
                 "sumo": {
                     0: [0, 1, 0, 1, 0, 0, 0, 0],# 'WSES',
                     1: [0, 0, 0, 0, 0, 1, 0, 1],# 'NSSS',

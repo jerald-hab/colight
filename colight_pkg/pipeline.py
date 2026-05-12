@@ -133,12 +133,12 @@ class Pipeline:
         self.test_duration = []
 
         sample_num = 10 if self.dic_traffic_env_conf["NUM_INTERSECTIONS"]>=10 else min(self.dic_traffic_env_conf["NUM_INTERSECTIONS"], 9)
-        print("sample_num for early stopping:", sample_num)
+        # print("sample_num for early stopping:", sample_num)
         self.sample_inter_id = random.sample(range(self.dic_traffic_env_conf["NUM_INTERSECTIONS"]), sample_num)
         
 
     def early_stopping(self, dic_path, cnt_round): # Todo multi-process
-        print("decide whether to stop")
+        # print("decide whether to stop")
         early_stopping_start_time = time.time()
         record_dir = os.path.join(dic_path["PATH_TO_WORK_DIRECTORY"], "test_round", "round_"+str(cnt_round))
 
@@ -181,7 +181,7 @@ class Pipeline:
 
     def generator_wrapper(self, cnt_round, cnt_gen, dic_path, dic_exp_conf, dic_agent_conf, dic_traffic_env_conf,
                           best_round=None):
-        print(">>> ENTER generator_wrapper", cnt_round, cnt_gen, flush=True)
+        # print(">>> ENTER generator_wrapper", cnt_round, cnt_gen, flush=True)
         generator = Generator(cnt_round=cnt_round,
                               cnt_gen=cnt_gen,
                               dic_path=dic_path,
@@ -190,9 +190,9 @@ class Pipeline:
                               dic_traffic_env_conf=dic_traffic_env_conf,
                               best_round=best_round
                               )
-        print(">>> AFTER Generator() in wrapper", flush=True)
+        # print(">>> AFTER Generator() in wrapper", flush=True)
         generator.generate()
-        print(">>> AFTER generator.generate()", flush=True)
+        # print(">>> AFTER generator.generate()", flush=True)
         return
 
     def updater_wrapper(self, cnt_round, dic_agent_conf, dic_exp_conf, dic_traffic_env_conf, dic_path, best_round=None, bar_round=None):
@@ -211,7 +211,7 @@ class Pipeline:
         updater.update_network_for_agents()
 
         # self._save_model(cnt_round)
-        print("updater_wrapper end")
+        # print("updater_wrapper end")
         return
 
     def model_pool_wrapper(self, dic_path, dic_exp_conf, cnt_round):
@@ -285,7 +285,7 @@ class Pipeline:
 
     def construct_sample_batch(self, cs, start,stop):
         for inter_id in range(start, stop):
-            print("make construct_sample_wrapper for ", inter_id)
+            # print("make construct_sample_wrapper for ", inter_id)
             cs.make_reward(inter_id)
         
     # def _save_model(self, cnt_round):
@@ -327,14 +327,14 @@ class Pipeline:
                                             args=(cnt_round, cnt_gen, self.dic_path, self.dic_exp_conf,
                                                   self.dic_agent_conf, self.dic_traffic_env_conf, best_round)
                                             )
-                                print("before")
+                                # print("before")
                                 p.start()
-                                print("end")
+                                # print("end")
                                 process_list.append(p)
-                            print("before join")
+                            # print("before join")
                             for p in process_list:
                                 p.join()
-                            print("end join")
+                            # print("end join")
                         else:
                             for cnt_gen in range(self.dic_exp_conf["PRETRAIN_NUM_GENERATORS"]):
                                 self.generator_wrapper(cnt_round=cnt_round,
@@ -415,17 +415,17 @@ class Pipeline:
                                 args=(cnt_round, cnt_gen, self.dic_path, self.dic_exp_conf,
                                       self.dic_agent_conf, self.dic_traffic_env_conf, best_round)
                                 )
-                    print("before p")
+                    # print("before p")
                     p.start()
-                    print("end p")
+                    # print("end p")
                     process_list.append(p)
-                print("before join")
+                # print("before join")
                 for i in range(len(process_list)):
                     p = process_list[i]
-                    print("generator %d to join" % i)
+                    # print("generator %d to join" % i)
                     p.join()
                     print("generator %d finish join" % i)
-                print("end join")
+                # print("end join")
             else:
                 for cnt_gen in range(self.dic_exp_conf["NUM_GENERATORS"]):
                     self.generator_wrapper(cnt_round=cnt_round,
@@ -453,11 +453,11 @@ class Pipeline:
             # EvaluateSample()
             making_samples_end_time = time.time()
             making_samples_total_time = making_samples_end_time - making_samples_start_time
-            print("==============  update network =============")
-            print("MODEL_NAME at runtime:", self.dic_exp_conf["MODEL_NAME"])
-            print("LIST_MODEL:", self.dic_exp_conf["LIST_MODEL"])
-            print("LIST_MODEL_NEED_TO_UPDATE:", self.dic_exp_conf["LIST_MODEL_NEED_TO_UPDATE"])
-            print("multi_process:", multi_process)
+            # print("==============  update network =============")
+            # print("MODEL_NAME at runtime:", self.dic_exp_conf["MODEL_NAME"])
+            # print("LIST_MODEL:", self.dic_exp_conf["LIST_MODEL"])
+            # print("LIST_MODEL_NEED_TO_UPDATE:", self.dic_exp_conf["LIST_MODEL_NEED_TO_UPDATE"])
+            # print("multi_process:", multi_process)
             update_network_start_time = time.time()
             if self.dic_exp_conf["MODEL_NAME"] in self.dic_exp_conf["LIST_MODEL_NEED_TO_UPDATE"]:
                 if multi_process:
@@ -470,9 +470,9 @@ class Pipeline:
                                       best_round,
                                       bar_round))
                     p.start()
-                    print("update to join")
+                    # print("update to join")
                     p.join()
-                    print("update finish join") 
+                    # print("update finish join") 
                 else:
                     self.updater_wrapper(cnt_round=cnt_round,
                                          dic_agent_conf=self.dic_agent_conf,
@@ -510,7 +510,7 @@ class Pipeline:
             # test_evaluation_end_time = time.time()
             # test_evaluation_total_time = test_evaluation_end_time - test_evaluation_start_time
 
-            print('==============  early stopping =============')
+            # print('==============  early stopping =============')
             if self.dic_exp_conf["EARLY_STOP"]:
                 flag = self.early_stopping(self.dic_path, cnt_round)
                 if flag == 1:
@@ -527,7 +527,7 @@ class Pipeline:
                                       cnt_round),
                                 )
                     p.start()
-                    print("model_pool to join")
+                    # print("model_pool to join")
                     p.join()
                     print("model_pool finish join")
                 else:
@@ -560,12 +560,12 @@ class Pipeline:
 
             print("best_round: ", best_round)
 
-            print("Generator time: ",generator_total_time)
-            print("Making samples time:", making_samples_total_time)
-            print("update_network time:", update_network_total_time)
+            # print("Generator time: ",generator_total_time)
+            # print("Making samples time:", making_samples_total_time)
+            # print("update_network time:", update_network_total_time)
             # print("test_evaluation time:", test_evaluation_total_time)
 
-            print("round {0} ends, total_time: {1}".format(cnt_round, time.time()-round_start_time))
+            # print("round {0} ends, total_time: {1}".format(cnt_round, time.time()-round_start_time))
             f_time = open(os.path.join(self.dic_path["PATH_TO_WORK_DIRECTORY"],"running_time.csv"),"a")
             f_time.write("{0}\t{1}\t{2}\t{3}\t{4}\n".format(generator_total_time,making_samples_total_time,
                                                           update_network_total_time,0,

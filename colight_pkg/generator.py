@@ -6,17 +6,20 @@ import numpy as np
 import sys
 from multiprocessing import Process, Pool
 from colight_pkg.config import DIC_AGENTS, DIC_ENVS
-# from colight_pkg.anon_env import AnonEnv
-# from colight_pkg.agent import Agent   # if used
-# from colight_pkg.model_pool import MODEL_POOL  # if used
+
+import socket
+
+hostname = socket.gethostname()
+running_on_wulver = ("wulver" in hostname or "login" in hostname)
+
 
 class Generator:
     def __init__(self, cnt_round, cnt_gen, dic_path, dic_exp_conf,
              dic_agent_conf, dic_traffic_env_conf, best_round=None):
 
-        print(">>> ENTER Generator.__init__", flush=True)
-        print(">>> dic_traffic_env_conf:", dic_traffic_env_conf, flush=True)
-        print(">>> DIC_PATH:", dic_path, flush=True)
+        # print(">>> ENTER Generator.__init__", flush=True)
+        # print(">>> dic_traffic_env_conf:", dic_traffic_env_conf, flush=True)
+        # print(">>> DIC_PATH:", dic_path, flush=True)
         import os, shutil, copy
 
         # FIRST: assign attributes
@@ -28,23 +31,40 @@ class Generator:
         self.dic_traffic_env_conf = dic_traffic_env_conf
         self.best_round = best_round
 
-        print(">>> RAW ROADNET_FILE:", self.dic_traffic_env_conf["ROADNET_FILE"], flush=True)
-        print(">>> RAW TRAFFIC_FILE:", self.dic_traffic_env_conf["TRAFFIC_FILE"], flush=True) 
-        dataset_dir = os.path.abspath(self.dic_path["PATH_TO_DATA"])
-
+        # print(">>> RAW ROADNET_FILE:", self.dic_traffic_env_conf["ROADNET_FILE"], flush=True)
+        # print(">>> RAW TRAFFIC_FILE:", self.dic_traffic_env_conf["TRAFFIC_FILE"], flush=True) 
+        # dataset_dir = os.path.abspath(self.dic_path["PATH_TO_DATA"])
+        '''
         roadnet_path = os.path.abspath(
             os.path.join(dataset_dir, self.dic_traffic_env_conf["ROADNET_FILE"])
         )
         traffic_path = os.path.abspath(
             os.path.join(dataset_dir, self.dic_traffic_env_conf["TRAFFIC_FILE"])
         )
-        self.dic_traffic_env_conf["ROADNET_FILE"] = roadnet_path
-        self.dic_traffic_env_conf["TRAFFIC_FILE"] = traffic_path
-        print(">>> DATASET DIR:", dataset_dir, flush=True)
-        print(">>> RESOLVED ROADNET_FILE:", roadnet_path, flush=True)
-        print(">>> RESOLVED TRAFFIC_FILE:", traffic_path, flush=True)
-        print(">>> ROADNET EXISTS?", os.path.exists(roadnet_path), flush=True)
-        print(">>> TRAFFIC EXISTS?", os.path.exists(traffic_path), flush=True) 
+        '''
+        # --- BEGIN PATCH ---
+        # Special override ONLY for 10x10 to avoid HOME/NFS issues
+        if running_on_wulver:
+            # Wulver GPFS dataset
+            base_data_dir = f"/mmfs1/course/2026/spring/cs/669/jingli/jj668/colight/data/template_lsr/{self.dic_traffic_env_conf['NUM_ROW']}_{self.dic_traffic_env_conf['NUM_COL']}"
+        else:
+            # Local dataset
+            base_data_dir = self.dic_path["PATH_TO_DATA"]
+        # if self.dic_traffic_env_conf["NUM_ROW"] == 10 and self.dic_traffic_env_conf["NUM_COL"] == 10:
+        #     base_data_dir = "/mmfs1/course/2026/spring/cs/669/jingli/jj668/colight/data/template_lsr/10_10"
+        # else:
+        #     base_data_dir = self.dic_path["PATH_TO_DATA"]
+
+        roadnet_path = os.path.join(base_data_dir, self.dic_traffic_env_conf["ROADNET_FILE"])
+        traffic_path = os.path.join(base_data_dir, self.dic_traffic_env_conf["TRAFFIC_FILE"])
+        # --- END PATCH ---
+        # self.dic_traffic_env_conf["ROADNET_FILE"] = roadnet_path
+        # self.dic_traffic_env_conf["TRAFFIC_FILE"] = traffic_path
+        # print(">>> DATASET DIR:", dataset_dir, flush=True)
+        # print(">>> RESOLVED ROADNET_FILE:", roadnet_path, flush=True)
+        # print(">>> RESOLVED TRAFFIC_FILE:", traffic_path, flush=True)
+        # print(">>> ROADNET EXISTS?", os.path.exists(roadnet_path), flush=True)
+        # print(">>> TRAFFIC EXISTS?", os.path.exists(traffic_path), flush=True) 
 
         # Each generator gets its own isolated work directory
         self.path_to_work_directory = os.path.join(
@@ -56,18 +76,37 @@ class Generator:
         os.makedirs(self.path_to_work_directory, exist_ok=True)
 
         # Copy dataset files into THIS generator's directory
-        dst_roadnet = os.path.join(self.path_to_work_directory, "roadnet_6_6.json")
-        dst_flow = os.path.join(self.path_to_work_directory, "anon_6_6_300_0.3_bi.json")
+        # dst_roadnet = os.path.join(self.path_to_work_directory, "roadnet_6_6.json")
+        # dst_flow = os.path.join(self.path_to_work_directory, "anon_6_6_300_0.3_bi.json")
+        dst_roadnet = os.path.join(
+            self.path_to_work_directory,
+            self.dic_traffic_env_conf["ROADNET_FILE"]
+        )
 
-        if not os.path.exists(dst_roadnet):
+        dst_flow = os.path.join(
+            self.path_to_work_directory,
+            self.dic_traffic_env_conf["TRAFFIC_FILE"]
+        )
+        
+
+        try:
             shutil.copy(roadnet_path, dst_roadnet)
+            # print("COPY SUCCESS:", roadnet_path, "→", dst_roadnet)
+        except Exception as e:
+            print("COPY FAILED:", e)
 
-        if not os.path.exists(dst_flow):
+        # if not os.path.exists(dst_flow):
+        
+        try:
             shutil.copy(traffic_path, dst_flow)
+            # print("COPY SUCCESS:", traffic_path, "→", dst_flow)
+        except Exception as e:
+            print("COPY FAILED:", e)
 
-        print("ROADNET:", self.dic_traffic_env_conf["ROADNET_FILE"])
-        print("FLOW:", self.dic_traffic_env_conf["TRAFFIC_FILE"])
-        print("WORKDIR:", self.path_to_work_directory)
+
+        # print("ROADNET:", self.dic_traffic_env_conf["ROADNET_FILE"])
+        # print("FLOW:", self.dic_traffic_env_conf["TRAFFIC_FILE"])
+        # print("WORKDIR:", self.path_to_work_directory)
 
         # Log directory should also be generator-specific
         self.path_to_log = self.path_to_work_directory
@@ -80,11 +119,11 @@ class Generator:
         )
 
         self.env.reset()
-        print("Lane count:", len(self.env.list_intersection[0].list_entering_lanes))
-        print("=== PHASE MAPS FOR ALL INTERSECTIONS ===")
-        for idx, inter in enumerate(self.env.list_intersection):
-            print(f"Intersection {idx}: {inter.DIC_PHASE_MAP}")
-        print("========================================")
+        # print("Lane count:", len(self.env.list_intersection[0].list_entering_lanes))
+        # print("=== PHASE MAPS FOR ALL INTERSECTIONS ===")
+        # for idx, inter in enumerate(self.env.list_intersection):
+        #     print(f"Intersection {idx}: {inter.DIC_PHASE_MAP}")
+        # print("========================================")
         # 2. Extract the real phase map from the environment
         phase_map = self.env.list_intersection[0].DIC_PHASE_MAP
 
@@ -114,7 +153,7 @@ class Generator:
         # Shared agent list: same agent for all intersections
         self.agents = [self.agent] * self.num_inters
 
-        print("Create intersection agent time:", time.time() - start_time)
+        # print("Create intersection agent time:", time.time() - start_time)
 
         # for i in range(1): #dic_traffic_env_conf['NUM_AGENTS'] only 1 agent even though multi agent envt
         #     agent_name = self.dic_exp_conf["MODEL_NAME"]
@@ -239,6 +278,8 @@ class Generator:
             # -------------------------------
             next_state, reward, done, _ = self.env.step(action_list)
 
+            state = next_state
+            step_num += 1
             # print("time: {0}, running_time: {1}".format(
             #     self.env.get_current_time() - self.dic_traffic_env_conf["MIN_ACTION_TIME"],
             #     time.time() - step_start_time
@@ -253,11 +294,11 @@ class Generator:
         #   LOGGING
         # -------------------------------
         log_start_time = time.time()
-        print("start logging")
+        # print("start logging")
         self.env.bulk_log_multi_process()
         log_time = time.time() - log_start_time
 
         self.env.end_sumo()
-        print("reset_env_time: ", reset_env_time)
-        print("running_time: ", running_time)
-        print("log_time: ", log_time)
+        # print("reset_env_time: ", reset_env_time)
+        # print("running_time: ", running_time)
+        # print("log_time: ", log_time)
